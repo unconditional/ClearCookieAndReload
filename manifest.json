@@ -5,8 +5,7 @@
     "version": "0.4",
     "permissions": [
         "cookies",
-        "http://*/*",
-        "https://*/*"
+        "<all_urls>"
     ],
     "background": {
         "scripts": [
