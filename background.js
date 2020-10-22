@@ -1,36 +1,43 @@
 // triggered when user clicks on installed extention icon
 chrome.browserAction.onClicked.addListener(function (tab) {
 
-    let url = tab.url;
+	let url = tab.url;
 
-    // clear all cookies for the current url
-    chrome.cookies.getAll({ url: url }, function (cookies) {
-        console.log("Clearing cookies for active urL", url, cookies);
-        clearCookies(cookies);
-    });
+    // https://stackoverflow.com/questions/50098229/chrome-extension-get-all-tab-cookies
+	chrome.tabs.executeScript({
+		code: 'window.performance.getEntriesByType("resource").map(e => e.name)',
+	}, data => {
+		if (chrome.runtime.lastError || !data || !data[0])
+			return;
+		const urls = data[0].map(url => url.split(/[#?]/)[0]);
+		const uniqueUrls = [...new Set(urls).values()].filter(Boolean);
+		Promise.all(uniqueUrls.map(url => new Promise(resolve => {
+					chrome.cookies.getAll({
+						url
+					}, resolve);
+				}))).then(results => {
+			// convert the array of arrays into a deduplicated flat array of cookies
+			const cookies = [...new Map([].concat(...results).map(c => [JSON.stringify(c), c])).values()];
 
-    // retrive domain from active tab
-    let matches = url.match(/^https?\:\/\/([^\/?#]+)(?:[\/?#]|$)/i);
-    let domain = matches && matches[1].replace('www.', '');
-    domain = "." + domain;
-
-    // get all cookies for domain
-    chrome.cookies.getAll({ domain: domain }, function (cookies) {
-        console.log("Clearing cookies for domain", domain, cookies);
-        clearCookies(cookies);
-    });
+//			console.log(uniqueUrls, cookies);
+			clearCookies(cookies);
+            
+            // reload currect active tab
+            chrome.tabs.reload();
+		});
+	});
 });
 
 function clearCookies(cookies) {
-    // iterate on cookie to get cookie detail
-    for (let i = 0; i < cookies.length; i++) {
-        let url = "http" + (cookies[i].secure ? "s" : "") + "://" + cookies[i].domain + cookies[i].path;
-        let cname = cookies[i].name;
+	// iterate on cookie to get cookie detail
+	for (let i = 0; i < cookies.length; i++) {
+		let url = "http" + (cookies[i].secure ? "s" : "") + "://" + cookies[i].domain + cookies[i].path;
+		let cname = cookies[i].name;
 
-        // delete cookie
-        chrome.cookies.remove({
-            url: url,
-            name: cname
-        });
-    }
+		// delete cookie
+		chrome.cookies.remove({
+			url: url,
+			name: cname
+		});
+	}
 }
